@@ -12,7 +12,7 @@ st.set_page_config(page_title="FDA PMA Explorer", layout="wide")
 @st.cache_data
 def load_data():
     return pd.read_csv(
-        r"C:\Users\laipx\OneDrive - Abbott\Sharktank\Submission\PMA\pma.txt",
+         r"https://raw.githubusercontent.com/d8557379/FDA_PMA_streamlit_app/main/pma.txt",
         sep="|",
         dtype=str,
         keep_default_na=True,
