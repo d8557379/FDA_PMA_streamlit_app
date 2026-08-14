@@ -3,7 +3,9 @@ import streamlit as st
 import pandas as pd
 import requests
 from pathlib import Path
- 
+import io
+import zipfile
+
 st.set_page_config(page_title="FDA PMA Explorer", layout="wide")
  
 # -----------------------------
@@ -66,7 +68,7 @@ for col in df.columns:
             ]
  
 st.sidebar.markdown("---")
-st.sidebar.subheader("Quick Filters")
+st.sidebar.subheader("Reset Filters")
  
 #applicant = st.sidebar.text_input(
 #    "Applicant",
@@ -117,6 +119,10 @@ if st.sidebar.button("Applicant: Roche"):
     st.session_state["applicant"] = "Roche"
     st.rerun()
 
+if st.sidebar.button("Applicant: Abbott Laboratories"):
+    st.session_state["applicant"] = "Abbott Laboratories"
+    st.rerun()
+
 # Use the value from st.session_state for filtering
 applicant_filter_value = st.session_state.get("applicant", "")
 
@@ -151,7 +157,7 @@ if "PMANUMBER" in filtered_df.columns and pma_filter_value:
 # Convert date columns to datetime
 filtered_df["DATERECEIVED"] = pd.to_datetime(filtered_df["DATERECEIVED"])
 filtered_df["DECISIONDATE"] = pd.to_datetime(filtered_df["DECISIONDATE"])
-
+filtered_df["SUPPLEMENTCOUNT"] = filtered_df.groupby("PMANUMBER")["SUPPLEMENTNUMBER"].transform("nunique")
 filtered_df["REVIEW TIME (DAYS)"] = ( filtered_df["DECISIONDATE"] - filtered_df["DATERECEIVED"]).dt.days
 
 filtered_df["Submission Year"] = filtered_df["DATERECEIVED"].dt.year
@@ -226,40 +232,57 @@ st.dataframe(
 )
  
 # -----------------------------
-# Download PDFs
+# Download PDFs as ZIP
 # -----------------------------
+
+
 st.subheader("Download PDFs")
- 
-download_dir = Path("downloads")
-download_dir.mkdir(exist_ok=True)
- 
-if st.button("Download All Visible PDFs"):
- 
-    progress = st.progress(0)
- 
-    total = len(pdf_rows)
- 
-    for i, row in enumerate(pdf_rows):
- 
-        url = row["PDF Link"]
- 
-        filename = (
-            download_dir /
-            f"{row['PMANUMBER']}{row['Document']}.pdf"
-        )
- 
-        try:
-            r = requests.get(url, timeout=30)
- 
-            if r.status_code == 200:
-                with open(filename, "wb") as f:
-                    f.write(r.content)
- 
-        except Exception:
-            pass
- 
-        progress.progress((i + 1) / total)
- 
-    st.success(
-        f"Download attempt completed. Files saved to {download_dir}"
-    )
+
+if st.button("Prepare ZIP of All Visible PDFs"):
+	progress = st.progress(0)
+	
+	zip_buffer = io.BytesIO()
+	
+	total = len(pdf_rows)
+	
+	with zipfile.ZipFile(
+		zip_buffer,
+		mode="w",
+		compression=zipfile.ZIP_DEFLATED,
+	) as zip_file:
+		
+		for i, row in enumerate(pdf_rows):
+			
+			url = row["PDF Link"]
+			
+			filename = (
+				f"{row['PMANUMBER']}"
+				f"{row['Document']}.pdf"
+			)
+			
+			try:
+				r = requests.get(url, timeout=30)
+				
+				if r.status_code == 200:
+					zip_file.writestr(
+						filename,
+						r.content,
+					)
+				
+			except Exception:
+				pass
+			
+			progress.progress((i + 1) / total)
+			
+	zip_buffer.seek(0)
+	
+	st.success(
+		f"ZIP prepared with up to {total} PDFs."
+	)
+	
+	st.download_button(
+		label="Download ZIP",
+		data=zip_buffer,
+		file_name="visible_pma_pdfs.zip",
+		mime="application/zip",
+	)
