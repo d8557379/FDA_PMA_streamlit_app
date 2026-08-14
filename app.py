@@ -34,13 +34,14 @@ st.title("FDA PMA Explorer")
 # Dynamic Filters for Every Column
 # -----------------------------
 st.sidebar.header("Filters")
- 
+
 filtered_df = df.copy()
+filtered_df = filtered_df.sort_values(by="DECISIONDATE", ascending=False)
  
 for col in df.columns:
     values = sorted(df[col].dropna().astype(str).unique())
  
-    if len(values) <= 50:
+    if len(values) <= 100:
         selected = st.sidebar.multiselect(
             col,
             values,
@@ -64,54 +65,92 @@ for col in df.columns:
                 .str.contains(text_filter, case=False, na=False)
             ]
  
-# -----------------------------
-# Default Filters from R Script
-# -----------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("Quick Filters")
  
-applicant = st.sidebar.text_input(
-    "Applicant"
-)
+#applicant = st.sidebar.text_input(
+#    "Applicant",
+#    value='Abbott',
+#    placeholder="Type to search applicant..."
+#)
+# 
+#if applicant:
+#    filtered_df = filtered_df[
+#        filtered_df["APPLICANT"]
+#        .fillna("")
+#        .str.contains(applicant, case=False)
+#    ]
+# 
+#if "PMANUMBER" in filtered_df.columns:
+#    pma = st.sidebar.text_input("PMA Number", placeholder="Type to search PMA number", value='P050042',)
+#    if pma:
+#        filtered_df = filtered_df[
+#        filtered_df["PMANUMBER"]
+#        .fillna("")
+#        .str.contains(pma, case=False, na=False)
+#        ]
  
-if applicant:
-    filtered_df = filtered_df[
-        filtered_df["APPLICANT"]
-        .fillna("")
-        .str.contains(applicant, case=False)
-    ]
- 
-if "PMANUMBER" in filtered_df.columns:
-    pma = st.sidebar.text_input("PMA Number")
-    if pma:
+# Initialize defaults
+if "applicant" not in st.session_state:
+    st.session_state["applicant"] = "Abbott"
+
+if "pma" not in st.session_state:
+    st.session_state["pma"] = "P050042"
+
+
+# Reset button
+if st.sidebar.button("Reset Filters"):
+    st.session_state["applicant"] = ""
+    st.session_state["pma"] = ""
+    st.rerun()
+
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Quick Filters")
+
+# Quick filter buttons for specific applicants
+if st.sidebar.button("Applicant: Abbott"):
+    st.session_state["applicant"] = "Abbott"
+    st.rerun()
+
+if st.sidebar.button("Applicant: Roche"):
+    st.session_state["applicant"] = "Roche"
+    st.rerun()
+
+# Use the value from st.session_state for filtering
+applicant_filter_value = st.session_state.get("applicant", "")
+
+# NOTE: filtered_df is not defined in this snippet. Assuming it's defined elsewhere.
+# For demonstration, let's assume a dummy filtered_df if not present.
+# if 'filtered_df' not in locals():
+#     filtered_df = pd.DataFrame(columns=["APPLICANT", "PMANUMBER"])
+
+if applicant_filter_value:
+    # This part assumes 'filtered_df' is already defined and accessible.
+    # If not, this code would raise a NameError.
+    # Ensure 'filtered_df' is initialized before this block, e.g., filtered_df = initial_dataframe.
+    # For the purpose of indentation, I will re-indent it as if 'filtered_df' exists.
+    if 'filtered_df' in locals() or 'filtered_df' in globals(): # Placeholder for context
         filtered_df = filtered_df[
+            filtered_df["APPLICANT"]
+            .fillna("")
+            .str.contains(applicant_filter_value, case=False, na=False)
+        ]
+
+# Use the value from st.session_state for filtering
+pma_filter_value = st.session_state.get("pma", "")
+
+# This part assumes 'filtered_df' exists and has a 'PMANUMBER' column if the condition is met.
+# Also assuming filtered_df is updated by the applicant filter before this block.
+if "PMANUMBER" in filtered_df.columns and pma_filter_value:
+    filtered_df = filtered_df[
         filtered_df["PMANUMBER"]
         .fillna("")
-        .str.contains(pma, case=False, na=False)
-        ]
- 
-if "CITY" in filtered_df.columns:
-    city = st.sidebar.text_input(
-        "City"
-    )
- 
-    if city:
-        filtered_df = filtered_df[
-            filtered_df["CITY"]
-            .fillna("")
-            .str.upper()
-            .eq(city.upper())
-        ]
- 
-#if "SUPPLEMENTNUMBER" in filtered_df.columns:
-#    filtered_df = filtered_df[
-#        filtered_df["SUPPLEMENTNUMBER"].isna()
-#    ]
- 
+        .str.contains(pma_filter_value, case=False, na=False)
+    ] 
 # Convert date columns to datetime
 filtered_df["DATERECEIVED"] = pd.to_datetime(filtered_df["DATERECEIVED"])
 filtered_df["DECISIONDATE"] = pd.to_datetime(filtered_df["DECISIONDATE"])
-
 
 filtered_df["REVIEW TIME (DAYS)"] = ( filtered_df["DECISIONDATE"] - filtered_df["DATERECEIVED"]).dt.days
 
@@ -168,14 +207,14 @@ if "PMANUMBER" in filtered_df.columns and "Submission Year" in filtered_df.colum
             "PMANUMBER": pma,
             "Document": doc,
             "PDF Link": url,
-            "Link": url
+           # "Link": url
                 })
  
     pdf_df = pd.DataFrame(pdf_rows)
     pdf_df['Document Name'] = pdf_df['Document'].map(mapping)
     
 st.dataframe(
-    pdf_df[['PMANUMBER','Document Name', 'PDF Link', "Link"]].drop_duplicates(),
+    pdf_df[['PMANUMBER','Document Name', 'PDF Link']].drop_duplicates(),
     width='stretch',
     column_config={
         "PDF Link": st.column_config.LinkColumn(
