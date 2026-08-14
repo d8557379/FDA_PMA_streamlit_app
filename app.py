@@ -21,10 +21,8 @@ def load_data():
 df = load_data()
 df =df.loc[:, [
         "PMANUMBER",
+        "SUPPLEMENTNUMBER",
         "APPLICANT",
-        "CITY",
-        "STATE",
-        "GENERICNAME",
         "TRADENAME",
         "PRODUCTCODE",
         "DATERECEIVED",
@@ -73,8 +71,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Quick Filters")
  
 applicant = st.sidebar.text_input(
-    "Applicant",
-    value="ABBOTT"
+    "Applicant"
 )
  
 if applicant:
@@ -95,8 +92,7 @@ if "PMANUMBER" in filtered_df.columns:
  
 if "CITY" in filtered_df.columns:
     city = st.sidebar.text_input(
-        "City",
-        value="ABBOTT PARK"
+        "City"
     )
  
     if city:
@@ -107,19 +103,22 @@ if "CITY" in filtered_df.columns:
             .eq(city.upper())
         ]
  
-# Original R logic
-if "SUPPLEMENTNUMBER" in filtered_df.columns:
-    filtered_df = filtered_df[
-        filtered_df["SUPPLEMENTNUMBER"].isna()
-    ]
+#if "SUPPLEMENTNUMBER" in filtered_df.columns:
+#    filtered_df = filtered_df[
+#        filtered_df["SUPPLEMENTNUMBER"].isna()
+#    ]
  
 # Convert date columns to datetime
 filtered_df["DATERECEIVED"] = pd.to_datetime(filtered_df["DATERECEIVED"])
 filtered_df["DECISIONDATE"] = pd.to_datetime(filtered_df["DECISIONDATE"])
 
+
 filtered_df["REVIEW TIME (DAYS)"] = ( filtered_df["DECISIONDATE"] - filtered_df["DATERECEIVED"]).dt.days
 
-filtered_df["year"] = filtered_df["DATERECEIVED"].dt.year
+filtered_df["Submission Year"] = filtered_df["DATERECEIVED"].dt.year
+# Format the datetime objects to display only the date part (YYYY-MM-DD)
+filtered_df['DATERECEIVED'] = filtered_df['DATERECEIVED'].dt.strftime('%Y-%m-%d')
+filtered_df['DECISIONDATE'] = filtered_df['DECISIONDATE'].dt.strftime('%Y-%m-%d')
 # -----------------------------
 # Display Results
 # -----------------------------
@@ -129,8 +128,9 @@ st.write(f"Records found: {len(filtered_df):,}")
  
 st.dataframe(
     filtered_df,
-    use_container_width=True,
-    height=600
+    height=600,
+    width="content",
+    hide_index=True
 )
  
 # -----------------------------
@@ -139,41 +139,44 @@ st.dataframe(
 st.subheader("FDA PMA Documents")
  
 docs = ["A", "B", "C"]
- 
-if "PMANUMBER" in filtered_df.columns and "year" in filtered_df.columns:
+mapping = {'A': 'Approval Order', 'B': 'Summary', 'C': 'Labeling'}
+
+if "PMANUMBER" in filtered_df.columns and "Submission Year" in filtered_df.columns:
  
     pdf_rows = []
  
     unique_df = (
         filtered_df
-        [["PMANUMBER", "year"]]
+        [["PMANUMBER", "SUPPLEMENTNUMBER", "Submission Year"]]
         .drop_duplicates()
         .reset_index(drop=True)
     )
- 
+
+
     for _, row in unique_df.iterrows():
  
         pma = str(row["PMANUMBER"])
-        for year in range(1, 11): # pdf1 ... pdf10
-            for doc in docs:
- 
-                url = (
-                   f"https://www.accessdata.fda.gov/"
-                   f"cdrh_docs/pdf5/"
-                   f"{pma}{doc}.pdf"
-             )
 
-                pdf_rows.append({
-                    "PMANUMBER": pma,
-                "Document": doc,
-                "PDF Link": url
-            })
+        for doc in docs:
+            url = (
+            f"https://www.accessdata.fda.gov/"
+            f"cdrh_docs/pdf5/"
+            f"{pma}{doc}.pdf"
+            )
+
+            pdf_rows.append({
+            "PMANUMBER": pma,
+            "Document": doc,
+            "PDF Link": url,
+            "Link": url
+                })
  
     pdf_df = pd.DataFrame(pdf_rows)
- 
+    pdf_df['Document Name'] = pdf_df['Document'].map(mapping)
+    
 st.dataframe(
-    pdf_df,
-    use_container_width=True,
+    pdf_df[['PMANUMBER','Document Name', 'PDF Link', "Link"]].drop_duplicates(),
+    width='stretch',
     column_config={
         "PDF Link": st.column_config.LinkColumn(
             "PDF Link",
