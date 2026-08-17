@@ -160,7 +160,7 @@ filtered_df["DECISIONDATE"] = pd.to_datetime(filtered_df["DECISIONDATE"])
 filtered_df["SUPPLEMENTCOUNT"] = filtered_df.groupby("PMANUMBER")["SUPPLEMENTNUMBER"].transform("nunique")
 filtered_df["REVIEW TIME (DAYS)"] = ( filtered_df["DECISIONDATE"] - filtered_df["DATERECEIVED"]).dt.days
 
-filtered_df["Submission Year"] = filtered_df["DATERECEIVED"].dt.year
+filtered_df["year"] = filtered_df["DATERECEIVED"].dt.year
 # Format the datetime objects to display only the date part (YYYY-MM-DD)
 filtered_df['DATERECEIVED'] = filtered_df['DATERECEIVED'].dt.strftime('%Y-%m-%d')
 filtered_df['DECISIONDATE'] = filtered_df['DECISIONDATE'].dt.strftime('%Y-%m-%d')
@@ -186,13 +186,13 @@ st.subheader("FDA PMA Documents")
 docs = ["A", "B", "C"]
 mapping = {'A': 'Approval Order', 'B': 'Summary', 'C': 'Labeling'}
 
-if "PMANUMBER" in filtered_df.columns and "Submission Year" in filtered_df.columns:
+if "PMANUMBER" in filtered_df.columns and "year" in filtered_df.columns:
  
     pdf_rows = []
  
     unique_df = (
-        filtered_df
-        [["PMANUMBER", "SUPPLEMENTNUMBER", "Submission Year"]]
+        filtered_df[filtered_df['SUPPLEMENTNUMBER'].isna()] # Filter out rows where SUPPLEMENTNUMBER is blank/NaN
+        [["PMANUMBER", "year"]]
         .drop_duplicates()
         .reset_index(drop=True)
     )
@@ -201,31 +201,37 @@ if "PMANUMBER" in filtered_df.columns and "Submission Year" in filtered_df.colum
     for _, row in unique_df.iterrows():
  
         pma = str(row["PMANUMBER"])
+        year2 = str(int(str(row["year"])[-2:]))
 
         for doc in docs:
             url = (
-            f"https://www.accessdata.fda.gov/"
-            f"cdrh_docs/pdf5/"
+            f"https://www.accessdata.fda.gov/cdrh_docs/pdf{year2}/"
             f"{pma}{doc}.pdf"
             )
-
+            
+            fallback_url = (f"https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpma/pma.cfm?ID={pma}")
+            
             pdf_rows.append({
             "PMANUMBER": pma,
             "Document": doc,
             "PDF Link": url,
-           # "Link": url
+            "Verified Link": fallback_url
                 })
- 
+    
     pdf_df = pd.DataFrame(pdf_rows)
     pdf_df['Document Name'] = pdf_df['Document'].map(mapping)
     
 st.dataframe(
-    pdf_df[['PMANUMBER','Document Name', 'PDF Link']].drop_duplicates(),
+    pdf_df[['PMANUMBER','Document Name', 'PDF Link', "Verified Link"]].drop_duplicates(),
     width='stretch',
     column_config={
         "PDF Link": st.column_config.LinkColumn(
             "PDF Link",
             display_text=r".*/([^/]+\.pdf)$"
+        ),
+        "Verified Link": st.column_config.LinkColumn(
+            "Verified Link",
+            display_text=r".*ID=([^/]+)"
         )
     },
     hide_index=True
