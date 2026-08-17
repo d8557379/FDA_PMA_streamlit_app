@@ -201,7 +201,14 @@ if "PMANUMBER" in filtered_df.columns and "year" in filtered_df.columns:
     for _, row in unique_df.iterrows():
  
         pma = str(row["PMANUMBER"])
-        year2 = str(int(str(row["year"])[-2:]))
+        
+        yr=int(str(row["year"]))
+        if yr < 2002:
+            year2 = ""
+        else:
+            year2 = str(int(str(row["year"])[-2:]))
+        
+        
 
         for doc in docs:
             url = (
@@ -251,44 +258,55 @@ if st.button("Prepare ZIP of All Visible PDFs"):
 	
 	total = len(pdf_rows)
 	
-	with zipfile.ZipFile(
-		zip_buffer,
-		mode="w",
-		compression=zipfile.ZIP_DEFLATED,
-	) as zip_file:
+	if total == 0:
+		st.warning("No PDFs found to prepare in the ZIP.")
+	else:
+		with zipfile.ZipFile(
+			zip_buffer,
+			mode="w",
+			compression=zipfile.ZIP_DEFLATED,
+		) as zip_file:
+			
+			for i, row in enumerate(pdf_rows):
+				
+				url = row["PDF Link"]
+				
+				filename = (
+					f"{row['PMANUMBER']}"
+					f"{row['Document']}.pdf"
+				)
+				
+				st.write(f"Attempting to download: {filename} from {url}") # Debugging line
+				try:
+					r = requests.get(url, timeout=30)
+					
+					if r.status_code == 200:
+						zip_file.writestr(
+							filename,
+							r.content,
+						)
+						st.write(f"Successfully added {filename} to ZIP.") # Debugging line
+					else:
+						st.warning(f"Failed to download {filename} (Status: {r.status_code}).") # Debugging line
+					
+				except requests.exceptions.RequestException as e:
+					st.error(f"Error downloading {filename} from {url}: {e}") # Debugging line
+				except Exception as e:
+					st.error(f"An unexpected error occurred for {filename}: {e}") # Debugging line
+			
+				progress.progress((i + 1) / total)
+				
+		zip_buffer.seek(0)
 		
-		for i, row in enumerate(pdf_rows):
-			
-			url = row["PDF Link"]
-			
-			filename = (
-				f"{row['PMANUMBER']}"
-				f"{row['Document']}.pdf"
-			)
-			
-			try:
-				r = requests.get(url, timeout=30)
-				
-				if r.status_code == 200:
-					zip_file.writestr(
-						filename,
-						r.content,
-					)
-				
-			except Exception:
-				pass
-			
-			progress.progress((i + 1) / total)
-			
-	zip_buffer.seek(0)
-	
-	st.success(
-		f"ZIP prepared with up to {total} PDFs."
-	)
+		st.success(
+			f"ZIP prepared with up to {total} PDFs."
+		)
+		
 	
 	st.download_button(
 		label="Download ZIP",
 		data=zip_buffer,
-		file_name="visible_pma_pdfs.zip",
+		file_name="pma_pdfs.zip",
 		mime="application/zip",
+		key="download_zip_button" # Added unique key
 	)
