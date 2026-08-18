@@ -6,7 +6,7 @@ from pathlib import Path
 import io
 import zipfile
 
-st.set_page_config(page_title="FDA PMA Explorer", layout="wide")
+st.set_page_config(page_title="FDA Premarket Approval(PMA) Explorer", layout="wide")
  
 # -----------------------------
 # Load Data
@@ -30,11 +30,49 @@ df =df.loc[:, [
         "DATERECEIVED",
         "DECISIONDATE",
     ]]
-st.title("FDA PMA Explorer")
+st.title("FDA Premarket Approval(PMA) Explorer")
  
 # -----------------------------
 # Dynamic Filters for Every Column
 # -----------------------------
+
+st.sidebar.markdown("# Application Setup Note")
+st.sidebar.markdown("This application has been set up for **Abbott, PMA P050042**. Click **Reset Filters** bottom to begin explorering")
+st.sidebar.markdown("---")
+st.sidebar.subheader("Reset Filters")
+ 
+ 
+# Initialize defaults
+if "applicant" not in st.session_state:
+    st.session_state["applicant"] = "Abbott"
+
+if "pma" not in st.session_state:
+    st.session_state["pma"] = "P050042"
+
+
+# Reset button
+if st.sidebar.button("Reset Filters"):
+    st.session_state["applicant"] = ""
+    st.session_state["pma"] = ""
+    st.rerun()
+
+
+st.sidebar.subheader("Quick Filters")
+
+# Quick filter buttons for specific applicants
+if st.sidebar.button("Applicant: Abbott"):
+    st.session_state["applicant"] = "Abbott"
+    st.rerun()
+
+if st.sidebar.button("Applicant: Roche"):
+    st.session_state["applicant"] = "Roche"
+    st.rerun()
+
+if st.sidebar.button("Applicant: Abbott Laboratories"):
+    st.session_state["applicant"] = "Abbott Laboratories"
+    st.rerun()
+st.sidebar.markdown("---")
+   
 st.sidebar.header("Filters")
 
 filtered_df = df.copy()
@@ -67,62 +105,6 @@ for col in df.columns:
                 .str.contains(text_filter, case=False, na=False)
             ]
  
-st.sidebar.markdown("---")
-st.sidebar.subheader("Reset Filters")
- 
-#applicant = st.sidebar.text_input(
-#    "Applicant",
-#    value='Abbott',
-#    placeholder="Type to search applicant..."
-#)
-# 
-#if applicant:
-#    filtered_df = filtered_df[
-#        filtered_df["APPLICANT"]
-#        .fillna("")
-#        .str.contains(applicant, case=False)
-#    ]
-# 
-#if "PMANUMBER" in filtered_df.columns:
-#    pma = st.sidebar.text_input("PMA Number", placeholder="Type to search PMA number", value='P050042',)
-#    if pma:
-#        filtered_df = filtered_df[
-#        filtered_df["PMANUMBER"]
-#        .fillna("")
-#        .str.contains(pma, case=False, na=False)
-#        ]
- 
-# Initialize defaults
-if "applicant" not in st.session_state:
-    st.session_state["applicant"] = "Abbott"
-
-if "pma" not in st.session_state:
-    st.session_state["pma"] = "P050042"
-
-
-# Reset button
-if st.sidebar.button("Reset Filters"):
-    st.session_state["applicant"] = ""
-    st.session_state["pma"] = ""
-    st.rerun()
-
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("Quick Filters")
-
-# Quick filter buttons for specific applicants
-if st.sidebar.button("Applicant: Abbott"):
-    st.session_state["applicant"] = "Abbott"
-    st.rerun()
-
-if st.sidebar.button("Applicant: Roche"):
-    st.session_state["applicant"] = "Roche"
-    st.rerun()
-
-if st.sidebar.button("Applicant: Abbott Laboratories"):
-    st.session_state["applicant"] = "Abbott Laboratories"
-    st.rerun()
-
 # Use the value from st.session_state for filtering
 applicant_filter_value = st.session_state.get("applicant", "")
 
@@ -158,12 +140,25 @@ if "PMANUMBER" in filtered_df.columns and pma_filter_value:
 filtered_df["DATERECEIVED"] = pd.to_datetime(filtered_df["DATERECEIVED"])
 filtered_df["DECISIONDATE"] = pd.to_datetime(filtered_df["DECISIONDATE"])
 filtered_df["SUPPLEMENTCOUNT"] = filtered_df.groupby("PMANUMBER")["SUPPLEMENTNUMBER"].transform("nunique")
-filtered_df["REVIEW TIME (DAYS)"] = ( filtered_df["DECISIONDATE"] - filtered_df["DATERECEIVED"]).dt.days
+filtered_df["Review Time (Day)"] = ( filtered_df["DECISIONDATE"] - filtered_df["DATERECEIVED"]).dt.days
 
 filtered_df["year"] = filtered_df["DATERECEIVED"].dt.year
 # Format the datetime objects to display only the date part (YYYY-MM-DD)
 filtered_df['DATERECEIVED'] = filtered_df['DATERECEIVED'].dt.strftime('%Y-%m-%d')
 filtered_df['DECISIONDATE'] = filtered_df['DECISIONDATE'].dt.strftime('%Y-%m-%d')
+
+filtered_df = filtered_df.rename(columns={
+    "PMANUMBER": "PMA Number",
+    "SUPPLEMENTNUMBER": "Supplement Number",
+    "APPLICANT": "Applicant Name",
+    "TRADENAME": "Trade Name",
+    "PRODUCTCODE": "Product Code",
+    "DATERECEIVED": "Date Received",
+    "DECISIONDATE": "Decision Date",
+    "year": "Submission Year",
+    "SUPPLEMENTCOUNT": "Supplement Count",        
+})
+
 # -----------------------------
 # Display Results
 # -----------------------------
@@ -186,13 +181,13 @@ st.subheader("FDA PMA Documents")
 docs = ["A", "B", "C"]
 mapping = {'A': 'Approval Order', 'B': 'Summary', 'C': 'Labeling'}
 
-if "PMANUMBER" in filtered_df.columns and "year" in filtered_df.columns:
+if "PMA Number" in filtered_df.columns and "Submission Year" in filtered_df.columns:
  
     pdf_rows = []
  
     unique_df = (
-        filtered_df[filtered_df['SUPPLEMENTNUMBER'].isna()] # Filter out rows where SUPPLEMENTNUMBER is blank/NaN
-        [["PMANUMBER", "year"]]
+        filtered_df[filtered_df['Supplement Number'].isna()] # Filter out rows where SUPPLEMENTNUMBER is blank/NaN
+        [["PMA Number", "Submission Year"]]
         .drop_duplicates()
         .reset_index(drop=True)
     )
@@ -200,13 +195,13 @@ if "PMANUMBER" in filtered_df.columns and "year" in filtered_df.columns:
 
     for _, row in unique_df.iterrows():
  
-        pma = str(row["PMANUMBER"])
+        pma = str(row["PMA Number"])
         
-        yr=int(str(row["year"]))
+        yr=int(str(row["Submission Year"]))
         if yr < 2002:
             year2 = ""
         else:
-            year2 = str(int(str(row["year"])[-2:]))
+            year2 = str(int(str(row["Submission Year"])[-2:]))
         
         
 
@@ -219,25 +214,25 @@ if "PMANUMBER" in filtered_df.columns and "year" in filtered_df.columns:
             fallback_url = (f"https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpma/pma.cfm?ID={pma}")
             
             pdf_rows.append({
-            "PMANUMBER": pma,
+            "PMA Number": pma,
             "Document": doc,
             "PDF Link": url,
-            "Verified Link": fallback_url
+            "FDA Premarket Approval Page": fallback_url
                 })
     
     pdf_df = pd.DataFrame(pdf_rows)
     pdf_df['Document Name'] = pdf_df['Document'].map(mapping)
     
 st.dataframe(
-    pdf_df[['PMANUMBER','Document Name', 'PDF Link', "Verified Link"]].drop_duplicates(),
+    pdf_df[["PMA Number", "Document", "Document Name", "PDF Link", "FDA Premarket Approval Page"]].drop_duplicates(),
     width='stretch',
     column_config={
         "PDF Link": st.column_config.LinkColumn(
             "PDF Link",
             display_text=r".*/([^/]+\.pdf)$"
         ),
-        "Verified Link": st.column_config.LinkColumn(
-            "Verified Link",
+        "FDA Premarket Approval Page": st.column_config.LinkColumn(
+            "FDA Premarket Approval Page",
             display_text=r".*ID=([^/]+)"
         )
     },
@@ -274,13 +269,13 @@ if st.button("Prepare ZIP of All Visible PDFs"):
             
             for i, row in enumerate(pdf_rows):
                 current_progress = (i + 1) / total_pdfs
-                progress_text.text(f"Downloading PDF {i + 1} of {total_pdfs}: {row['PMANUMBER']}{row['Document']}.pdf")
+                progress_text.text(f"Downloading PDF {i + 1} of {total_pdfs}: {row['PMA Number']}{row['Document']}.pdf")
                 progress_bar.progress(current_progress)
                 
                 url = row["PDF Link"]
                 
                 filename = (
-                    f"{row['PMANUMBER']}"
+                    f"{row['PMA Number']}"
                     f"{row['Document']}.pdf"
                 )
                 
