@@ -30,6 +30,18 @@ df =df.loc[:, [
         "DATERECEIVED",
         "DECISIONDATE",
     ]]
+
+df = df.rename(columns={
+    "PMANUMBER": "PMA Number",
+    "SUPPLEMENTNUMBER": "Supplement Number",
+    "APPLICANT": "Applicant Name",
+    "TRADENAME": "Trade Name",
+    "PRODUCTCODE": "Product Code",
+    "DATERECEIVED": "Date Received",
+    "DECISIONDATE": "Decision Date",
+    "SUPPLEMENTCOUNT": "Supplement Count",        
+})
+
 st.title("FDA Premarket Approval(PMA) Explorer")
  
 # -----------------------------
@@ -43,8 +55,8 @@ st.sidebar.subheader("Reset Filters")
  
  
 # Initialize defaults
-if "applicant" not in st.session_state:
-    st.session_state["applicant"] = "Abbott"
+if "Applicant Name" not in st.session_state:
+    st.session_state["Applicant Name"] = "Abbott"
 
 if "pma" not in st.session_state:
     st.session_state["pma"] = "P050042"
@@ -52,7 +64,7 @@ if "pma" not in st.session_state:
 
 # Reset button
 if st.sidebar.button("Reset Filters"):
-    st.session_state["applicant"] = ""
+    st.session_state["Applicant Name"] = ""
     st.session_state["pma"] = ""
     st.rerun()
 
@@ -60,23 +72,23 @@ if st.sidebar.button("Reset Filters"):
 st.sidebar.subheader("Quick Filters")
 
 # Quick filter buttons for specific applicants
-if st.sidebar.button("Applicant: Abbott"):
-    st.session_state["applicant"] = "Abbott"
+if st.sidebar.button("Applicant Name: Abbott"):
+    st.session_state["Applicant Name"] = "Abbott"
     st.rerun()
 
-if st.sidebar.button("Applicant: Roche"):
-    st.session_state["applicant"] = "Roche"
+if st.sidebar.button("Applicant Name: Roche"):
+    st.session_state["Applicant Name"] = "Roche"
     st.rerun()
 
-if st.sidebar.button("Applicant: Abbott Laboratories"):
-    st.session_state["applicant"] = "Abbott Laboratories"
+if st.sidebar.button("Applicant Name: Abbott Laboratories"):
+    st.session_state["Applicant Name"] = "Abbott Laboratories"
     st.rerun()
 st.sidebar.markdown("---")
    
 st.sidebar.header("Filters")
 
 filtered_df = df.copy()
-filtered_df = filtered_df.sort_values(by="DECISIONDATE", ascending=False)
+filtered_df = filtered_df.sort_values(by="Decision Date", ascending=False)
  
 for col in df.columns:
     values = sorted(df[col].dropna().astype(str).unique())
@@ -106,12 +118,12 @@ for col in df.columns:
             ]
  
 # Use the value from st.session_state for filtering
-applicant_filter_value = st.session_state.get("applicant", "")
+applicant_filter_value = st.session_state.get("Applicant Name", "")
 
 # NOTE: filtered_df is not defined in this snippet. Assuming it's defined elsewhere.
 # For demonstration, let's assume a dummy filtered_df if not present.
 # if 'filtered_df' not in locals():
-#     filtered_df = pd.DataFrame(columns=["APPLICANT", "PMANUMBER"])
+#     filtered_df = pd.DataFrame(columns=["Applicant Name", "PMA Number"])
 
 if applicant_filter_value:
     # This part assumes 'filtered_df' is already defined and accessible.
@@ -120,7 +132,7 @@ if applicant_filter_value:
     # For the purpose of indentation, I will re-indent it as if 'filtered_df' exists.
     if 'filtered_df' in locals() or 'filtered_df' in globals(): # Placeholder for context
         filtered_df = filtered_df[
-            filtered_df["APPLICANT"]
+            filtered_df["Applicant Name"]
             .fillna("")
             .str.contains(applicant_filter_value, case=False, na=False)
         ]
@@ -128,36 +140,26 @@ if applicant_filter_value:
 # Use the value from st.session_state for filtering
 pma_filter_value = st.session_state.get("pma", "")
 
-# This part assumes 'filtered_df' exists and has a 'PMANUMBER' column if the condition is met.
+# This part assumes 'filtered_df' exists and has a 'PMA Number' column if the condition is met.
 # Also assuming filtered_df is updated by the applicant filter before this block.
-if "PMANUMBER" in filtered_df.columns and pma_filter_value:
+if "PMA Number" in filtered_df.columns and pma_filter_value:
     filtered_df = filtered_df[
-        filtered_df["PMANUMBER"]
+        filtered_df["PMA Number"]
         .fillna("")
         .str.contains(pma_filter_value, case=False, na=False)
     ] 
 # Convert date columns to datetime
-filtered_df["DATERECEIVED"] = pd.to_datetime(filtered_df["DATERECEIVED"])
-filtered_df["DECISIONDATE"] = pd.to_datetime(filtered_df["DECISIONDATE"])
-filtered_df["SUPPLEMENTCOUNT"] = filtered_df.groupby("PMANUMBER")["SUPPLEMENTNUMBER"].transform("nunique")
-filtered_df["Review Time (Day)"] = ( filtered_df["DECISIONDATE"] - filtered_df["DATERECEIVED"]).dt.days
+filtered_df["Date Received"] = pd.to_datetime(filtered_df["Date Received"])
+filtered_df["Decision Date"] = pd.to_datetime(filtered_df["Decision Date"])
+filtered_df["Supplement Count"] = filtered_df.groupby("PMA Number")["Supplement Number"].transform("nunique")
+filtered_df["Review Time (Day)"] = ( filtered_df["Decision Date"] - filtered_df["Date Received"]).dt.days
 
-filtered_df["year"] = filtered_df["DATERECEIVED"].dt.year
+filtered_df["Submission Year"] = filtered_df["Date Received"].dt.year
 # Format the datetime objects to display only the date part (YYYY-MM-DD)
-filtered_df['DATERECEIVED'] = filtered_df['DATERECEIVED'].dt.strftime('%Y-%m-%d')
-filtered_df['DECISIONDATE'] = filtered_df['DECISIONDATE'].dt.strftime('%Y-%m-%d')
+filtered_df['Date Received'] = filtered_df['Date Received'].dt.strftime('%Y-%m-%d')
+filtered_df['Decision Date'] = filtered_df['Decision Date'].dt.strftime('%Y-%m-%d')
 
-filtered_df = filtered_df.rename(columns={
-    "PMANUMBER": "PMA Number",
-    "SUPPLEMENTNUMBER": "Supplement Number",
-    "APPLICANT": "Applicant Name",
-    "TRADENAME": "Trade Name",
-    "PRODUCTCODE": "Product Code",
-    "DATERECEIVED": "Date Received",
-    "DECISIONDATE": "Decision Date",
-    "year": "Submission Year",
-    "SUPPLEMENTCOUNT": "Supplement Count",        
-})
+
 
 # -----------------------------
 # Display Results
@@ -186,7 +188,7 @@ if "PMA Number" in filtered_df.columns and "Submission Year" in filtered_df.colu
     pdf_rows = []
  
     unique_df = (
-        filtered_df[filtered_df['Supplement Number'].isna()] # Filter out rows where SUPPLEMENTNUMBER is blank/NaN
+        filtered_df[filtered_df['Supplement Number'].isna()] # Filter out rows where Supplement Number" is blank/NaN
         [["PMA Number", "Submission Year"]]
         .drop_duplicates()
         .reset_index(drop=True)
