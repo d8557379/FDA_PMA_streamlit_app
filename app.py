@@ -248,65 +248,71 @@ st.dataframe(
 # Download PDFs as ZIP
 # -----------------------------
 
+# Define the headers to mimic a web browser
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
 
 st.subheader("Download PDFs")
 
 if st.button("Prepare ZIP of All Visible PDFs"):
-	progress = st.progress(0)
-	
-	zip_buffer = io.BytesIO()
-	
-	total = len(pdf_rows)
-	
-	if total == 0:
-		st.warning("No PDFs found to prepare in the ZIP.")
-	else:
-		with zipfile.ZipFile(
-			zip_buffer,
-			mode="w",
-			compression=zipfile.ZIP_DEFLATED,
-		) as zip_file:
-			
-			for i, row in enumerate(pdf_rows):
-				
-				url = row["PDF Link"]
-				
-				filename = (
-					f"{row['PMANUMBER']}"
-					f"{row['Document']}.pdf"
-				)
-				
-				st.write(f"Attempting to download: {filename} from {url}") # Debugging line
-				try:
-					r = requests.get(url, timeout=30)
-					
-					if r.status_code == 200:
-						zip_file.writestr(
-							filename,
-							r.content,
-						)
-						st.write(f"Successfully added {filename} to ZIP.") # Debugging line
-					else:
-						st.warning(f"Failed to download {filename} (Status: {r.status_code}).") # Debugging line
-					
-				except requests.exceptions.RequestException as e:
-					st.error(f"Error downloading {filename} from {url}: {e}") # Debugging line
-				except Exception as e:
-					st.error(f"An unexpected error occurred for {filename}: {e}") # Debugging line
-			
-				progress.progress((i + 1) / total)
-				
-		zip_buffer.seek(0)
-		
-		st.success(
-			f"ZIP prepared with up to {total} PDFs."
-		)
-		
-	
-	st.download_button(
-		label="Download ZIP",
-		data=zip_buffer,
-		file_name="pma_pdfs.zip",
-		mime="application/zip",
-		key="download_zip_button" # Added unique key
-	)
+    progress_text = st.empty()
+    progress_bar = st.progress(0)
+
+    zip_buffer = io.BytesIO()
+    
+    total_pdfs = len(pdf_rows)
+    
+    if total_pdfs == 0:
+        st.warning("No PDFs found to prepare in the ZIP.")
+    else:
+        with zipfile.ZipFile(
+            zip_buffer,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as zip_file:
+            
+            for i, row in enumerate(pdf_rows):
+                current_progress = (i + 1) / total_pdfs
+                progress_text.text(f"Downloading PDF {i + 1} of {total_pdfs}: {row['PMANUMBER']}{row['Document']}.pdf")
+                progress_bar.progress(current_progress)
+                
+                url = row["PDF Link"]
+                
+                filename = (
+                    f"{row['PMANUMBER']}"
+                    f"{row['Document']}.pdf"
+                )
+                
+                try:
+                    r = requests.get(url, timeout=30, headers=headers)
+                    
+                    if r.status_code == 200:
+                        zip_file.writestr(
+                            filename,
+                            r.content,
+                        )
+                        st.info(f"Successfully added {filename} to ZIP.")
+                    else:
+                        st.warning(f"Failed to download {filename} (Status: {r.status_code}).")
+                    
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Error downloading {filename} from {url}: {e}")
+                except Exception as e:
+                    st.error(f"An unexpected error occurred for {filename}: {e}")
+            
+        zip_buffer.seek(0)
+        progress_text.empty() # Clear progress text
+        progress_bar.empty() # Clear progress bar
+
+        st.success(
+            f"ZIP prepared with {total_pdfs} PDFs. Click the button below to download."
+        )
+        
+        st.download_button(
+            label="Download ZIP",
+            data=zip_buffer,
+            file_name="pma_pdfs.zip",
+            mime="application/zip",
+            key="download_zip_button"
+        )
