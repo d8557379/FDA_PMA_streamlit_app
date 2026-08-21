@@ -49,14 +49,14 @@ st.title("FDA Premarket Approval(PMA) Explorer")
 # -----------------------------
 
 st.sidebar.markdown("# Application Setup Note")
-st.sidebar.markdown("This application has been set up for **Abbott, PMA P050042**. Click **Reset Filters** bottom to begin explorering")
+st.sidebar.markdown("For demostration purpose, this application has been preselected for **PMA P050042**. Click **Reset Filters** bottom to begin explorering")
 st.sidebar.markdown("---")
 st.sidebar.subheader("Reset Filters")
  
  
 # Initialize defaults
 if "Applicant Name" not in st.session_state:
-    st.session_state["Applicant Name"] = "Abbott"
+    st.session_state["Applicant Name"] = ""
 
 if "pma" not in st.session_state:
     st.session_state["pma"] = "P050042"
